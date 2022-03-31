@@ -1,0 +1,100 @@
+---
+title: "Visualization"
+author: "Liow Yi Jia"
+date: "3/22/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+# load libraries
+library(gt)
+```
+
+```{r}
+prop.table(table(FOOD$shop_convenience, FOOD$region), 1)
+```
+
+
+```{r}
+## MLR Result 
+# load data
+food_result <- read.csv("~/Dropbox/Food Environment/Input Files (.csv)/nutrition.csv")
+
+# transform data frame
+food_env <- food_result %>% 
+  gt() %>%
+  tab_header(title = "Food Environment on Diet Quality",
+             subtitle = "Nutrition status of the Japanese population") %>%
+  cols_label(energy = "Energy", protein = "Protein", fat = "Fat", 
+             carbohydrate = "Carbohydrate", fiber = "Fiber") %>%
+  tab_source_note(source_note = "Diet quality of Japanese population in suburbans") %>%
+  tab_row_group(
+    label = "Income Level",
+    rows = term %in% c("income2", "income3")
+  ) %>%
+  tab_row_group(
+    label = "Education Level",
+    rows = term %in% c("education2", "education3", "education4", "education5", "education6")
+  ) %>%
+  tab_row_group(
+    label = "Sex",
+    rows = term %in% c("sex")
+  ) %>%
+  tab_row_group(
+    label = "Age",
+    rows = term %in% c("age")
+  ) %>%
+  tab_row_group(
+    label = "Consumption of Homegrown Vegetables",
+    rows = term %in% c("homegrown2", "homegrown3")
+  ) %>%
+  tab_row_group(
+    label = "Use of Bento Delivery",
+    rows = term %in% c("bento2", "bento3")
+  ) %>%
+  tab_row_group(
+    label = "Use of Foodstuff Delivery",
+    rows = term %in% c("foodstuff2", "foodstuff3")
+  ) %>%
+  tab_row_group(
+    label = "Use of Automobile",
+    rows = term %in% c("transportation2")
+  ) %>%
+  tab_row_group(
+    label = "Time to Nearest Store",
+    rows = term %in% c("time")
+  ) %>%
+  tab_row_group(
+    label = "Shopping Frequency",
+    rows = term %in% c("shop_frequency2", "shop_frequency3", "shop_frequency4")
+  ) %>%
+  tab_row_group(
+    label = "Shopping Convenience",
+    rows = term %in% c("shop_convenience2", "shop_convenience3", "shop_convenience4")
+  ) %>%
+  tab_row_group(
+    label = "Region",
+    rows = term %in% c("regionK", "regionO", "regionT")
+  ) %>%
+  tab_style(
+    style = list(cell_fill(color = "#F4F4F4")),
+    locations = cells_body(columns = term)
+  ) %>%
+  tab_options(
+    table.width = pct(100)
+  ) %>%
+  cols_align(
+    align = "center",
+    columns = vars(energy, protein, fat, carbohydrate, fiber)
+  )
+  #row_label(
+    #regionK = "Katsuura-shi", regionO = "Oga-shi", regionT = "Takahashi-shi",
+    #shop_convenience2 = "Inconvenient", shop_convenience3 = "Convenient", 
+    #shop_convenience_4 = "Very Convenient",
+    #shop_frequency2 = "3~6 times/week", shop_frequency3 = "1~2 times/week",
+    #shop_frequency4 = "Few times/month",
+  #)
+print(food_env)
+#gtsave(food_env, "Food Environment.png", "~/Desktop/Food Environment.png")
+```
+

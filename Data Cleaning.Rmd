@@ -1,0 +1,191 @@
+---
+title: "Food Environment"
+author: "Liow Yi Jia"
+date: "2/10/2022"
+output: html_document
+---
+
+```{r}
+# install packages
+install.packages("summarytools")
+install.packages("flextable")
+install.packages("skimr")
+install.packages("rstatix")
+install.packages("janitor")
+install.packages("gtsummary")
+install.packages("corrr")
+```
+
+```{r}
+# load libraries
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(car)
+library(summarytools)
+library(flextable)
+library(skimr)
+library(rstatix)
+library(janitor)
+library(gtsummary)
+library(corrr)
+```
+
+```{r}
+# load dataset
+food <- read.csv("~/Dropbox/Food Environment/Input Files (.csv)/kourei.csv", fileEncoding = "utf8")
+food <- as_tibble(food)
+print(food)
+
+### step 1 - data cleaning
+# change variable names
+food_new <- food %>% rename(region = 調査地,
+                            sex = 性別, 
+                            age = 年齢,
+                            alone = 独居,
+                            household = 世帯人数,
+                            income = 世帯所得,
+                            education = 学校教育,
+                            shop_convenience = 買い物便利,
+                            shop_frequency = 買い物頻度,
+                            transportation = 買い物に車,
+                            time = 店までの分,
+                            foodstuff = 宅配等利用,
+                            bento = 弁当宅配利用,
+                            homegrown = 栽培野菜,
+                            health = 健康自己評価,
+                            energy = エネルギー,
+                            protein = たんぱく質,
+                            fat = 脂質,
+                            carbohydrate = 炭水化物, 
+                            fiber = 食物繊維総量, 
+                            fermented = 漬物,
+                            health = 健康自己評価)
+
+# select variables
+food2 <- food_new %>% select(region, sex, age, alone, household, income, education, 
+                             shop_convenience, shop_frequency, transportation, time, 
+                             foodstuff, bento, homegrown, health, 
+                             energy, protein, fat, carbohydrate, fiber,
+                             fermented, health)
+
+# adjust for energy intake
+food3 <- food2 %>% mutate(adj_protein = (protein*1000)/energy,
+                 adj_fat = (fat*1000)/energy,
+                 adj_carbohydrate = (carbohydrate*1000)/energy)
+
+# remove data from region N
+food_env <- food3 %>% filter(region %in% c("A", "K", "O", "T")) # %in% for multiple condition
+
+# make appropriate variable class
+x <- c("alone", "income", "education", "shop_convenience", "shop_frequency", "transportation",
+       "foodstuff", "bento", "homegrown", "fermented", "health")
+food_env[x] <- lapply(food_env[x], as.factor)
+
+y <- c("age", "time")
+food_env[y] <- lapply(food_env[y], as.integer)
+
+# save object
+saveRDS(food_env, "food.rds") 
+FOOD <- readRDS("food.rds")
+```
+
+
+
+```{r}
+### statistical analysis
+# T-test: test for significant difference of continuous variables in two groups
+t.test(energy ~ sex, data = food4) 
+
+food4 %>% 
+  t_test(energy ~ sex)
+
+food4 %>% 
+  select(energy, sex) %>%                        # keep variables of interest
+  tbl_summary(                                   # produce summary table
+    statistic = energy ~ "{max} ({mean} {min})", # specify what statistics to show
+    by = sex) %>%                                # specify the grouping variable
+  add_p(energy ~ "t.test") 
+
+# Shapiro-Wilk Test: test of normality - I don't know how to read the result
+shapiro.test(food4$age) 
+
+food4 %>% 
+  shapiro_test(age)
+
+# Wilcoxon rank sum test: Compare distribution of a continuous variable in two groups
+wilcox.test(energy ~ sex, data = food4) 
+food4 %>% 
+  wilcox_test(energy ~ sex)
+
+food4 %>% 
+  select(energy, sex) %>%                        # keep variables of interest
+  tbl_summary(                                   # produce summary table
+    statistic = energy ~ "{max} ({p25}, {p75})", # specify what statistic to show 
+    by = sex) %>%                                # specify the grouping variable
+  add_p(energy ~ "wilcox.test") 
+
+# Kruskal-Wallis Test: differences in the distribution of >2 samples
+kruskal.test(energy ~ region, food4) 
+
+food4 %>% 
+  kruskal_test(energy ~ region)
+
+food4 %>% 
+  select(energy, region) %>%                        # keep variables of interest
+  tbl_summary(                                      # produce summary table
+    statistic = energy ~ "{median} ({p25}, {p75})", # specify what statistic to show 
+    by = region) %>%                                # specify the grouping variable
+  add_p(energy ~ "kruskal.test")                    # specify what test to perform
+
+# Chi-squared Test: significant differences between categorical groups
+chisq.test(food4$region, food4$energy) 
+
+food4 %>% 
+  tabyl(region, energy) %>% 
+  select(-1) %>% 
+  chisq_test()
+
+food4 %>% 
+  select(energy, region) %>%    # keep variables of interest
+  tbl_summary(by = region) %>%  # produce summary table and specify grouping variable
+  add_p() 
+
+# summary statistics
+food4 %>%
+  group_by(region) %>%
+  rstatix::get_summary_stats(energy, adj_protein, adj_fat, adj_carbohydrate,
+                             type = "five_number")
+
+food4 %>% 
+  group_by(region) %>%
+  t_test(energy ~ sex)
+```
+
+
+Univariate and Multivariate Regression
+```{r}
+# define variables of interest
+predictor <- c("region", "shop_convenience", "shop_frequency", "transportation", 
+                     "time", "foodstuff", "bento", "homegrown")
+
+covariates <- c("age", "sex", "alone", "household", "income", "education")
+
+outcome <- c("energy", "adj_protein", "adj_fat", "adj_carbohydrate", "fiber")
+
+# drop rows with missing values
+food_env <- food_env %>% 
+  drop_na(any_of(c(explanatory_var, covariates_var, outcome_var)))
+
+# linear regression base R
+lm_results <- lm(adj_protein ~ age, data = food_env)
+summary(lm_results)
+tidy(lm_results)
+
+## add your data to a plot 
+ ggplot(food_env, aes(x = age, y = adj_protein)) + 
+  geom_point() + 
+  geom_smooth(method = "lm", se = FALSE)
+```
+

@@ -1,0 +1,220 @@
+---
+title: "Descriptive Analysis"
+author: "Liow Yi Jia"
+date: "2/28/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+# load libraries
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(ggpubr)
+library(car)
+library(summarytools)
+library(flextable)
+library(skimr)
+library(rstatix)
+library(janitor)
+library(gtsummary)
+library(corrr)
+```
+
+
+```{r}
+str(food_env) # structure of dataset
+
+### Predictor Variables  
+# region
+# shop_convenience
+# shop_frequency
+# transportation
+# time
+# foodstuff
+# bento
+# homegrown
+
+# subjective shopping conveniency
+convenience <- food_env %>% tabyl(region, shop_convenience) %>%
+                                adorn_totals(where = "row") %>%
+                                adorn_percentages(denominator = "col") %>%
+                                adorn_pct_formatting() %>%
+                                adorn_ns(position = "front") %>%
+                                knitr::kable() 
+
+print(convenience)
+
+# Subjective shopping frequency
+frequency <- food_env %>% tabyl(region, shop_frequency) %>%
+                                adorn_totals(where = "row") %>%
+                                adorn_percentages(denominator = "col") %>%
+                                adorn_pct_formatting() %>%
+                                adorn_ns(position = "front") %>%
+                                knitr::kable() 
+
+print(frequency)
+
+# Mode of transportation
+transportation <- food_env %>% tabyl(region, transportation) %>%
+                                adorn_totals(where = "row") %>%
+                                adorn_percentages(denominator = "col") %>%
+                                adorn_pct_formatting() %>%
+                                adorn_ns(position = "front") %>%
+                                knitr::kable() 
+
+print(transportation)
+
+# Time traveled to closest store
+time <- food_env %>% 
+          group_by(region) %>%     
+          summarise(time)
+
+# Use of foodstuff delivery
+foodstuff <- food_env %>% tabyl(region, foodstuff) %>%
+                                adorn_totals(where = "row") %>%
+                                adorn_percentages(denominator = "col") %>%
+                                adorn_pct_formatting() %>%
+                                adorn_ns(position = "front") %>%
+                                knitr::kable() 
+
+print(foodstuff)
+
+# Use of bento delivery
+bento <- food_env %>% tabyl(region, bento) %>%
+                                adorn_totals(where = "row") %>%
+                                adorn_percentages(denominator = "col") %>%
+                                adorn_pct_formatting() %>%
+                                adorn_ns(position = "front") %>%
+                                knitr::kable() 
+
+print(bento)
+
+# homegrown
+homegrown <- food_env %>% tabyl(region, homegrown) %>%
+                                adorn_totals(where = "row") %>%
+                                adorn_percentages(denominator = "col") %>%
+                                adorn_pct_formatting() %>%
+                                adorn_ns(position = "front") %>%
+                                knitr::kable() 
+
+print(homegrown)
+
+### Outcome Variables
+# energy
+# adj_protein
+# adj_fat
+# adj_carbohydrate
+# fiber
+
+# summary statistics
+FOOD %>%
+  group_by(region) %>%
+  rstatix::get_summary_stats(energy, adj_protein, adj_fat, adj_carbohydrate,
+                             type = "five_number")
+
+FOOD %>% 
+  group_by(region) %>%
+  get_summary_stats(
+    energy, adj_protein, adj_fat, adj_carbohydrate, fiber, 
+    type = "five_number") %>%
+    flextable::flextable()
+
+sub_predictor <- c("shop_convenience", "shop_frequency")
+sub_predictor_result[i] <- for(i in sub_predictor){
+                          sub_pre_out <- ctable(
+                            x = FOOD[[i]],
+                            y = FOOD$region,
+                          totals = FALSE,
+                          headings = FALSE)
+  print(i)
+  print(sub_pre_out)
+}
+
+ob_predictor <- c("region", "transportation", "foodstuff", "bento", "homegrown")
+for(i in ob_predictor){
+obj_pre_out <- ctable(
+                  x = FOOD[[i]],
+                  y = FOOD$region,
+                  totals = FALSE,
+                  headings = FALSE)
+  print(i)
+  print(obj_pre_out)
+}
+
+cov <- c("sex", "alone", "income", "education")
+for(i in cov){
+covariate_out <- ctable(
+                  x = FOOD[[i]],
+                  y = FOOD$region,
+                  totals = FALSE,
+                  headings = FALSE)
+  print(i)
+  print(covariate_out)
+}
+
+num_predictor <- c("age", "time")
+descr(FOOD$age,
+  headings = FALSE, # remove headings
+  stats = c("mean", "sd") # most common descriptive statistics
+)
+
+out_des <- aggregate(cbind(energy, adj_protein, adj_fat, adj_carbohydrate, fiber) ~ region,
+              data = FOOD,
+              mean)
+
+t(out_des) 
+
+library(summarytools)
+
+# select variables
+food4 <- FOOD %>% select(region, sex, age, income, education, 
+                             shop_convenience, shop_frequency, transportation, time, 
+                             foodstuff, bento, homegrown, health, 
+                             energy, adj_protein, adj_fat, adj_carbohydrate, fiber)
+
+view(dfSummary(food4))
+```
+
+Visualization
+Histogram: Distribution of quantitative variables
+Boxplot: Compare and contrast quantitative variables from different populations/groups
+Scatterplot: Check for potential link between two quantitative variables
+Q-Q Plot: Check for normality assumption of a variable
+```{r}
+# histogram
+outcome <- c("energy", "adj_protein", "adj_fat", "adj_carbohydrate", "fiber")
+
+# one histogram
+plot <- ggplot(FOOD) +
+            aes(x = energy) +
+            geom_histogram()
+print(plot)
+
+# food_env[[“energy”]] # access column in tidyverse
+# food_env$energy
+# food_env$"energy"
+
+# histograms for outcome variables
+for(i in outcome) {                              
+  print(ggplot(FOOD, aes(x = FOOD[[i]])) +
+          geom_histogram() +
+          xlab(paste0("Outcome: ", outcome)))
+}
+
+xlabs <- c("Energy", "Adjusted Protein", "Adjusted Fat", "Adjusted Carbohydrate", "Total Fiber")
+
+# another way to do it
+for (i in 1:length(outcome)) {
+  var <- outcome[i]
+  print(
+    ggplot(FOOD, aes(FOOD[[var]])) +
+      geom_histogram() +
+      xlab(paste0("Outcome: ", xlabs[i]))
+  )
+
+}
+```
+

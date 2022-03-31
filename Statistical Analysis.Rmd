@@ -1,0 +1,182 @@
+---
+title: "Statistical Analysis"
+author: "Liow Yi Jia"
+date: "3/5/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+#install.packages("AICcmodavg")
+install.packages("xlsx")
+
+library(broom)
+library(MASS)
+library("xlsx")
+```
+
+1) Normality Check
+```{r}
+outcome <- c("energy", "adj_protein", "adj_fat", "adj_carbohydrate", "fiber")
+
+for(i in outcome){    
+  shapiro <- shapiro.test(FOOD[[i]])
+  print(i)
+  print(shapiro)
+}
+```
+
+2) Simple Linear Regression 
+```{r}
+FOOD <- na.omit(FOOD) # remove NAs from all variables
+
+predictor <- c("region", "shop_convenience", "shop_frequency", "transportation", 
+                     "time", "foodstuff", "bento", "homegrown")
+covariate <- c("age", "sex", "alone", "household", "income", "education")
+outcome <- c("energy", "adj_protein", "adj_fat", "adj_carbohydrate", "fiber")
+
+variables <- c(predictor, covariate)
+
+for (i in variables){ 
+  model <- lm(formula(paste0("outcome ~", i[[1]])), data = FOOD) 
+  print(summary(model)) 
+} 
+
+for (out in outcome){
+  for (var in variables){
+    model <- lm(formula(paste0(out, " ~ ", var)), data = FOOD) 
+    print(out)
+    print(summary(model))
+  }
+}
+
+#lm_results <- lm(adj_protein ~ age, data = FOOD)
+#summary(lm_results)
+```
+
+3) Multiple Linear Regression 
+Question: Does food environment affect nutrient intake in elderly Japanese population?
+```{r}
+protein <- lm(adj_protein ~ shop_convenience + shop_frequency + transportation +
+                time + foodstuff + bento + homegrown + age + sex + income +
+                education, data = FOOD)
+x <- tidy(protein)
+augment(protein)
+glance(protein)
+summary(protein)
+
+# multicollinearity check
+vif_values <- vif(protein)
+barplot(vif_values, main = "VIF Values", horiz = TRUE, col = "steelblue")
+
+# for loop for MLR
+for(i in outcome){
+  mlr_result <- lm(FOOD[[i]] ~ shop_convenience + shop_frequency + transportation +
+                time + foodstuff + bento + homegrown + age + sex + income +
+                education, data = FOOD) 
+  summary(mlr_result) # can store result in list
+  print(i)
+  print(summary(mlr_result))
+}
+
+# making a function to do MLR 
+nutrition <- function(outcome){
+  out_var <- formula(paste0(outcome, "~ region + shop_convenience + shop_frequency + 
+                transportation + time + foodstuff + bento + homegrown + 
+                age + sex + income + education"))
+  mlr_result <- lm(out_var, data = FOOD)
+  return(summary(mlr_result))
+}
+
+# example
+#test2 <- function(outcome){
+#  f1 <- formula(paste0(outcome, "~ shop_convenience"))
+#  return(f1)
+#}
+
+energy_result <- nutrition("energy") %>% tidy()
+protein_result <- nutrition("adj_protein") %>% tidy()
+fat_result <- nutrition("adj_fat") %>% tidy()
+carbohydrate_result <- nutrition("adj_carbohydrate") %>% tidy()
+fiber_result <- nutrition("fiber") %>% tidy()
+```
+
+Export MLR results to Excel
+```{r}
+# Write the first data set in a new workbook
+write.xlsx(energy_result, file = "~/Desktop/Food Environment.xlsx",
+      sheetName = "Energy", append = FALSE)
+# Add a second data set in a new worksheet
+write.xlsx(protein_result, file = "~/Desktop/Food Environment.xlsx", 
+           sheetName="Protein", append=TRUE)
+# Add a third data set in a new worksheet
+write.xlsx(fat_result, file = "~/Desktop/Food Environment.xlsx", 
+           sheetName="Fat", append=TRUE)
+# Add a fourth data set in a new worksheet
+write.xlsx(carbohydrate_result, file = "~/Desktop/Food Environment.xlsx", 
+           sheetName="Carbyhydrate", append=TRUE)
+# Add a fifth data set in a new worksheet
+write.xlsx(fiber_result, file = "~/Desktop/Food Environment.xlsx", 
+           sheetName="Fiber", append=TRUE)
+```
+
+
+4) Variable Selection 
+4-1) Stepwise Regression 
+ - Combination of forward and backward selection of predictors
+ - Add/remove predictors until preset significance level is met for all predictors
+ 
+4-2) AIC (Akaike Information Criterion)
+ - Find balance between the number of explanatory variables and goodness of fit
+ - Metric to compare the fit between several regression models
+ - Fit several regression models, compare AIC values of each model (the lower the better)
+ 
+```{r}
+# 4-1) Stepwise Regression
+# select variables
+food_4 <- food_env %>% select(region, sex, age, income, education, 
+                             shop_convenience, shop_frequency, transportation, time, 
+                             foodstuff, bento, homegrown, adj_protein)
+
+str(food_4)
+
+# make appropriate variable class
+x <- c("region", "income", "education", "shop_convenience", "shop_frequency", "transportation",
+       "foodstuff", "bento", "homegrown")
+food_4[x] <- lapply(food_4[x], as.factor)
+
+y <- c("age", "time")
+food_4[y] <- lapply(food_4[y], as.integer)
+
+food_4 <- na.omit(food_4) # remove NAs from all variables
+
+# Fit the full model 
+full_model <- lm(adj_protein ~., data = food_4)
+# Stepwise regression model
+step_model <- stepAIC(full_model, direction = "both", 
+                      trace = FALSE)
+summary(step_model)
+
+################################################################################
+# 4-2) AIC
+# make different models
+model1 <- lm(adj_protein ~ shop_convenience + transportation +
+                time + foodstuff + bento + homegrown + age + sex + income +
+                education, data = FOOD)
+model2 <- lm(adj_protein ~ shop_convenience + shop_frequency + 
+                time + foodstuff + bento + homegrown + age + sex + income +
+                education, data = FOOD)
+model3 <- lm(adj_protein ~ shop_convenience + shop_frequency + transportation +
+                foodstuff + bento + homegrown + age + sex + income +
+                education, data = FOOD)
+
+#define list of models
+models <- list(model1, model2, model3)
+
+#specify model names
+mod.names <- c('Model 1', 'Model 2', 'Model 3')
+
+#calculate AIC of each model
+aictab(cand.set = models, modnames = mod.names) #doesn't work - package doesn't load
+```
+
